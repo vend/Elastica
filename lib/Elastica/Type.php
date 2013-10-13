@@ -407,11 +407,11 @@ class Type implements SearchableInterface
      * @return \Elastica\Response
      * @link http://www.elasticsearch.org/guide/reference/api/delete-by-query.html
      */
-    public function deleteByQuery($query)
+    public function deleteByQuery($query, array $options = array())
     {
         $query = Query::create($query);
 
-        return $this->request('_query', Request::DELETE, $query->getQuery());
+        return $this->request('_query', Request::DELETE, $query->getQuery(), $options);
     }
 
     /**
