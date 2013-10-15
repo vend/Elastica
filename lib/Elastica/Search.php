@@ -450,7 +450,7 @@ class Search
             $path,
             Request::GET,
             $query->toArray(),
-            array(self::OPTION_SEARCH_TYPE => self::OPTION_SEARCH_TYPE_COUNT)
+            array_merge($this->getOptions(), array(self::OPTION_SEARCH_TYPE => self::OPTION_SEARCH_TYPE_COUNT))
         );
         $resultSet = new ResultSet($response, $query);
 		
