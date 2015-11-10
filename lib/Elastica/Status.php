@@ -1,41 +1,41 @@
 <?php
-
 namespace Elastica;
+
+use Elastica\Exception\ResponseException;
 use Elastica\Index\Status as IndexStatus;
 
 /**
- * Elastica general status
+ * Elastica general status.
  *
- * @category Xodoa
- * @package Elastica
  * @author Nicolas Ruflin <spam@ruflin.com>
- * @link http://www.elasticsearch.org/guide/reference/api/admin-indices-status.html
+ *
+ * @link http://www.elastic.co/guide/en/elasticsearch/reference/current/indices-status.html
  */
 class Status
 {
     /**
-     * Contains all status infos
+     * Contains all status infos.
      *
      * @var \Elastica\Response Response object
      */
     protected $_response = null;
 
     /**
-     * Data
+     * Data.
      *
      * @var array Data
      */
     protected $_data = array();
 
     /**
-     * Client object
+     * Client object.
      *
      * @var \Elastica\Client Client object
      */
     protected $_client = null;
 
     /**
-     * Constructs Status object
+     * Constructs Status object.
      *
      * @param \Elastica\Client $client Client object
      */
@@ -46,7 +46,7 @@ class Status
     }
 
     /**
-     * Returns status data
+     * Returns status data.
      *
      * @return array Status data
      */
@@ -56,7 +56,7 @@ class Status
     }
 
     /**
-     * Returns status objects of all indices
+     * Returns status objects of all indices.
      *
      * @return array|\Elastica\Index\Status[] List of Elastica\Client\Index objects
      */
@@ -72,25 +72,21 @@ class Status
     }
 
     /**
-     * Returns a list of the existing index names
+     * Returns a list of the existing index names.
      *
      * @return array Index names list
      */
     public function getIndexNames()
     {
-        $names = array();
-        foreach ($this->_data['indices'] as $name => $data) {
-            $names[] = $name;
-        }
-
-        return $names;
+        return array_keys($this->_data['indices']);
     }
 
     /**
-     * Checks if the given index exists
+     * Checks if the given index exists.
      *
-     * @param  string $name Index name to check
-     * @return bool   True if index exists
+     * @param string $name Index name to check
+     *
+     * @return bool True if index exists
      */
     public function indexExists($name)
     {
@@ -98,42 +94,48 @@ class Status
     }
 
     /**
-     * Checks if the given alias exists
+     * Checks if the given alias exists.
      *
-     * @param  string $name Alias name
-     * @return bool   True if alias exists
+     * @param string $name Alias name
+     *
+     * @return bool True if alias exists
      */
     public function aliasExists($name)
     {
-        foreach ($this->getIndexStatuses() as $status) {
-            if ($status->hasAlias($name)) {
-                return true;
-            }
-        }
-
-        return false;
+        return count($this->getIndicesWithAlias($name)) > 0;
     }
 
     /**
-     * Returns an array with all indices that the given alias name points to
+     * Returns an array with all indices that the given alias name points to.
      *
-     * @param  string                 $name Alias name
+     * @param string $alias Alias name
+     *
      * @return array|\Elastica\Index[] List of Elastica\Index
      */
-    public function getIndicesWithAlias($name)
+    public function getIndicesWithAlias($alias)
     {
-        $indices = array();
-        foreach ($this->getIndexStatuses() as $status) {
-            if ($status->hasAlias($name)) {
-                $indices[] = $status->getIndex();
+        $response = null;
+        try {
+            $response = $this->_client->request('/_alias/'.$alias);
+        } catch (ResponseException $e) {
+            $transferInfo = $e->getResponse()->getTransferInfo();
+            // 404 means the index alias doesn't exist which means no indexes have it.
+            if ($transferInfo['http_code'] === 404) {
+                return array();
             }
+            // If we don't have a 404 then this is still unexpected so rethrow the exception.
+            throw $e;
+        }
+        $indices = array();
+        foreach ($response->getData() as $name => $unused) {
+            $indices[] = new Index($this->_client, $name);
         }
 
         return $indices;
     }
 
     /**
-     * Returns response object
+     * Returns response object.
      *
      * @return \Elastica\Response Response object
      */
@@ -143,7 +145,7 @@ class Status
     }
 
     /**
-     * Return shards info
+     * Return shards info.
      *
      * @return array Shards info
      */
@@ -153,7 +155,7 @@ class Status
     }
 
     /**
-     * Refresh status object
+     * Refresh status object.
      */
     public function refresh()
     {
@@ -163,7 +165,7 @@ class Status
     }
 
     /**
-     * Refresh serverStatus object
+     * Refresh serverStatus object.
      */
     public function getServerStatus()
     {

@@ -1,32 +1,36 @@
-language: php
+sudo: required
+services:
+  - docker
 
-php:
-  - 5.3
-  - 5.4
-  - 5.5
-
-matrix:
-  allow_failures:
-    - php: 5.5
 
 env:
-  global:
-    - ES_VER=0.90.4
-    - ES_MAPPER_ATTACHMENTS_VER=1.9.0
-    - ES_TRANSPORT_THRIFT_VER=1.4.0
-    - ES_GEOCLUSTER_FACET_VER=0.0.8
-    - ES_WAIT_ON_MAPPING_CHANGE=true
-  matrix:
-    - ES_REQUIRE=dev
-    - ES_REQUIRE=no-dev
+  - TARGET="54"
+  - TARGET="55"
+  - TARGET="56"
+  - TARGET="70"
 
-before_script:
-  - composer self-update
-  - composer --${ES_REQUIRE} --prefer-source install
-  - ./test/bin/install_php_memcache.sh
-  - ./test/bin/run_elasticsearch.sh
-  - ./test/bin/run_proxy.sh
+branches:
+  only:
+    - master
 
-script: phpunit -c test/
+before_install:
+  # Docker-compose installation
+  - curl -L https://github.com/docker/compose/releases/download/1.4.0/docker-compose-`uname -s`-`uname -m` > docker-compose
+  - chmod +x docker-compose
+  - sudo mv docker-compose /usr/local/bin
 
-after_script: ./test/bin/show_logs.sh
+
+#before_script:
+#  - if $(phpenv version-name | grep -q '5.3'); then sudo composer update --no-dev; sudo composer dump-autoload; fi
+
+script:
+  - make tests TARGET=$TARGET
+
+after_script:
+  - cat /var/log/elasticsearch/*.log
+  - cat /var/log/nginx/*.log
+  - sudo rm composer.lock && sudo composer require satooshi/php-coveralls dev-master --no-ansi --no-progress --no-interaction
+  - vendor/bin/coveralls -v
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

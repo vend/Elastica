@@ -1,7 +1,9 @@
 .DS_Store
 .idea
+*.iml
 .vagrant
-.*
+.php_cs.cache
+
 cache.properties
 /nbproject
 build

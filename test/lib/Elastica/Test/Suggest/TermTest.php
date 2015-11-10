@@ -1,124 +1,112 @@
 <?php
-
 namespace Elastica\Test\Suggest;
 
-use Elastica\Test\Base as BaseTest;
-use Elastica\Suggest\Term;
-use Elastica\Query;
 use Elastica\Document;
-use Elastica\Search;
 use Elastica\Index;
+use Elastica\Suggest;
+use Elastica\Suggest\Term;
+use Elastica\Test\Base as BaseTest;
 
 class TermTest extends BaseTest
 {
-    public function testToArrayOneTerm()
+    /**
+     * @return Index
+     */
+    protected function _getIndexForTest()
     {
-        $suggest = new Term();
-        $suggest->addTerm('suggest1', array('text' => 'Foor', 'term' => array('field' => '_all', 'size' => 4)));
+        $index = $this->_createIndex();
+        $type = $index->getType('testSuggestType');
+        $type->addDocuments(array(
+            new Document(1, array('id' => 1, 'text' => 'GitHub')),
+            new Document(2, array('id' => 1, 'text' => 'Elastic')),
+            new Document(3, array('id' => 1, 'text' => 'Search')),
+            new Document(4, array('id' => 1, 'text' => 'Food')),
+            new Document(5, array('id' => 1, 'text' => 'Flood')),
+            new Document(6, array('id' => 1, 'text' => 'Folks')),
+        ));
+        $index->refresh();
 
-        $query = new Query();
-        $query->addSuggest($suggest);
+        return $index;
+    }
 
-        $expectedArray = array(
+    /**
+     * @group unit
+     */
+    public function testToArray()
+    {
+        $suggest = new Suggest();
+
+        $suggest1 = new Term('suggest1', '_all');
+        $suggest1->setSort(Term::SORT_FREQUENCY);
+
+        $suggest->addSuggestion($suggest1->setText('Foor'));
+
+        $suggest2 = new Term('suggest2', '_all');
+        $suggest2->setSuggestMode(Term::SUGGEST_MODE_POPULAR);
+        $suggest->addSuggestion($suggest2->setText('Girhub'));
+
+        $expected = array(
+            'suggest' => array(
                 'suggest1' => array(
-                    'text' => 'Foor',
                     'term' => array(
                         'field' => '_all',
-                        'size' => 4)
-                    )
-                );
-        $this->assertEquals($expectedArray, $suggest->toArray());
-    }
-
-    public function testToArrayMultipleTerms()
-    {
-        $suggest = new Term();
-        $suggest->addTerm('suggest1', array('text' => 'Foor', 'term' => array('field' => '_all', 'size' => 4)));
-        $suggest->addTerm('suggest2', array('text' => 'Fool', 'term' => array('field' => '_all', 'size' => 4)));
-
-        $query = new Query();
-        $query->addSuggest($suggest);
-
-        $expectedArray = array(
-            'suggest1' => array(
-                    'text' => 'Foor',
-                    'term' => array(
-                        'field' => '_all',
-                        'size' => 4)
+                        'sort' => 'frequency',
                     ),
-            'suggest2' => array(
-                    'text' => 'Fool',
+                    'text' => 'Foor',
+                ),
+                'suggest2' => array(
                     'term' => array(
                         'field' => '_all',
-                        'size' => 4)
-                    )
-            );
+                        'suggest_mode' => 'popular',
+                    ),
+                    'text' => 'Girhub',
+                ),
+            ),
+        );
 
-        $this->assertEquals($expectedArray, $suggest->toArray());
+        $this->assertEquals($expected, $suggest->toArray());
     }
 
+    /**
+     * @group functional
+     */
     public function testSuggestResults()
     {
-        $client = $this->_getClient();
-        $index = new Index($client, 'test_suggest');
-        $search = new Search($client);
+        $suggest = new Suggest();
+        $suggest1 = new Term('suggest1', '_all');
+        $suggest->addSuggestion($suggest1->setText('Foor seach'));
+        $suggest2 = new Term('suggest2', '_all');
+        $suggest->addSuggestion($suggest2->setText('Girhub'));
 
-        $index = $client->getIndex('test_suggest');
-        $index->create(array('index' => array('number_of_shards' => 1, 'number_of_replicas' => 0)), true);
-
-        $docs = array();
-        $docs[] = new Document(5, array('id' => 1, 'text' => 'GitHub'));
-        $docs[] = new Document(6, array('id' => 1, 'text' => 'Elastic'));
-        $docs[] = new Document(7, array('id' => 1, 'text' => 'Search'));
-        $docs[] = new Document(3, array('id' => 1, 'text' => 'Food'));
-        $docs[] = new Document(4, array('id' => 1, 'text' => 'Folks'));
-        $type = $index->getType('testSuggestType');
-        $type->addDocuments($docs);
-        $index->refresh();
-
-        $search->addIndex($index)->addType($type);
-
-        $suggest = new Term();
-        $suggest->addTerm('suggest1', array('text' => 'Foor', 'term' => array('field' => '_all', 'size' => 4)));
-        $suggest->addTerm('suggest2', array('text' => 'Girhub', 'term' => array('field' => '_all', 'size' => 4)));
-
-        $search->addSuggest($suggest);
-        $result = $search->search();
+        $index = $this->_getIndexForTest();
+        $result = $index->search($suggest);
 
         $this->assertEquals(2, $result->countSuggests());
-        
+
         $suggests = $result->getSuggests();
 
-        $this->assertEquals('github', $suggests['suggest2']['options'][0]['text']);
-        $this->assertEquals('food', $suggests['suggest1']['options'][0]['text']);
+        // Ensure that two suggestion results are returned for suggest1
+        $this->assertEquals(2, sizeof($suggests['suggest1']));
+
+        $this->assertEquals('github', $suggests['suggest2'][0]['options'][0]['text']);
+        $this->assertEquals('food', $suggests['suggest1'][0]['options'][0]['text']);
     }
 
+    /**
+     * @group functional
+     */
     public function testSuggestNoResults()
     {
-        $client = $this->_getClient();
-        $search = new Search($client);
-        $index = new Index($client, 'test_suggest');
+        $termSuggest = new Term('suggest1', '_all');
+        $termSuggest->setText('Foobar')->setSize(4);
 
-        $index = $client->getIndex('test_suggest');
-        $index->create(array('index' => array('number_of_shards' => 1, 'number_of_replicas' => 0)), true);
+        $index = $this->_getIndexForTest();
+        $result = $index->search($termSuggest);
 
-        $docs = array();
-        $docs[] = new Document(5, array('id' => 1, 'text' => 'GitHub'));
-        $docs[] = new Document(6, array('id' => 1, 'text' => 'Elastic'));
-        $docs[] = new Document(3, array('id' => 1, 'text' => 'Food'));
-        $docs[] = new Document(4, array('id' => 1, 'text' => 'Folks'));
-        $type = $index->getType('testSuggestType');
-        $type->addDocuments($docs);
-        $index->refresh();
+        $this->assertEquals(1, $result->countSuggests());
 
-        $search->addIndex($index)->addType($type);
-
-        $suggest = new Term();
-        $suggest->addTerm('suggest1', array('text' => 'Search', 'term' => array('field' => '_all', 'size' => 4)));
-
-        $search->addSuggest($suggest);
-        $result = $search->search();
-
-        $this->assertEquals(0, $result->countSuggests());
+        // Assert that no suggestions were returned
+        $suggests = $result->getSuggests();
+        $this->assertEquals(0, sizeof($suggests['suggest1'][0]['options']));
     }
 }

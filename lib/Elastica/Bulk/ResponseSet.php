@@ -1,5 +1,4 @@
 <?php
-
 namespace Elastica\Bulk;
 
 use Elastica\Response as BaseResponse;
@@ -17,7 +16,7 @@ class ResponseSet extends BaseResponse implements \Iterator, \Countable
     protected $_position = 0;
 
     /**
-     * @param \Elastica\Response $response
+     * @param \Elastica\Response        $response
      * @param \Elastica\Bulk\Response[] $bulkResponses
      */
     public function __construct(BaseResponse $response, array $bulkResponses)
@@ -36,7 +35,7 @@ class ResponseSet extends BaseResponse implements \Iterator, \Countable
     }
 
     /**
-     * Returns first found error
+     * Returns first found error.
      *
      * @return string
      */
@@ -101,11 +100,10 @@ class ResponseSet extends BaseResponse implements \Iterator, \Countable
     }
 
     /**
-     *
      */
     public function next()
     {
-        $this->_position++;
+        ++$this->_position;
     }
 
     /**
@@ -125,7 +123,6 @@ class ResponseSet extends BaseResponse implements \Iterator, \Countable
     }
 
     /**
-     *
      */
     public function rewind()
     {

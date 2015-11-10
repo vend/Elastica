@@ -1,21 +1,19 @@
 <?php
-
 namespace Elastica;
 
 use Elastica\Exception\InvalidException;
 
 /**
- * Script objects, containing script internals
+ * Script objects, containing script internals.
  *
- * @category Xodoa
- * @package Elastica
  * @author avasilenko <aa.vasilenko@gmail.com>
- * @link http://www.elasticsearch.org/guide/reference/modules/scripting.html
+ *
+ * @link http://www.elastic.co/guide/en/elasticsearch/reference/current/modules-scripting.html
  */
-class Script extends Param
+class Script extends AbstractScript
 {
-    const LANG_MVEL   = 'mvel';
-    const LANG_JS     = 'js';
+    const LANG_MVEL = 'mvel';
+    const LANG_JS = 'js';
     const LANG_GROOVY = 'groovy';
     const LANG_PYTHON = 'python';
     const LANG_NATIVE = 'native';
@@ -31,36 +29,31 @@ class Script extends Param
     private $_lang;
 
     /**
-     * @var \Elastica\Document
-     */
-    protected $_upsert;
-
-    /**
      * @param string      $script
      * @param array|null  $params
      * @param string|null $lang
      */
     public function __construct($script, array $params = null, $lang = null, $id = null)
     {
+        parent::__construct($params, $id);
+
         $this->setScript($script);
-        if ($params) {
-            $this->setParams($params);
-        }
+
         if ($lang) {
             $this->setLang($lang);
-        }
-
-        if ($id) {
-            $this->setId($id);
         }
     }
 
     /**
      * @param string $lang
+     *
+     * @return $this
      */
     public function setLang($lang)
     {
         $this->_lang = $lang;
+
+        return $this;
     }
 
     /**
@@ -73,10 +66,14 @@ class Script extends Param
 
     /**
      * @param string $script
+     *
+     * @return $this
      */
     public function setScript($script)
     {
         $this->_script = $script;
+
+        return $this;
     }
 
     /**
@@ -88,9 +85,11 @@ class Script extends Param
     }
 
     /**
-     * @param  string|array|\Elastica\Script        $data
+     * @param string|array|\Elastica\Script $data
+     *
      * @throws \Elastica\Exception\InvalidException
-     * @return \Elastica\Script
+     *
+     * @return self
      */
     public static function create($data)
     {
@@ -108,96 +107,11 @@ class Script extends Param
     }
 
     /**
-     * @param \Elastica\Document|array $data
-     * @return \Elastica\Document
-     */
-    public function setUpsert($data)
-    {
-        $document = Document::create($data);
-        $this->_upsert = $document;
-
-        return $this;
-    }
-
-    /**
-     * @return \Elastica\Document
-     */
-    public function getUpsert()
-    {
-        return $this->_upsert;
-    }
-
-    /**
-     * @return bool
-     */
-    public function hasUpsert()
-    {
-        return null !== $this->_upsert;
-    }
-
-    /**
-     * Sets the id of the document the script updates.
+     * @param array $data
      *
-     * @param  string            $id
-     * @return \Elastica\Script
-     */
-    public function setId($id)
-    {
-        return $this->setParam('_id', $id);
-    }
-
-    /**
-     * Returns id of the document the script updates.
-     *
-     * @return string|int Document id
-     */
-    public function getId()
-    {
-        return ($this->hasParam('_id')) ? $this->getParam('_id') : null;
-    }
-
-    /**
-     * @return bool
-     */
-    public function hasId()
-    {
-        return (bool)$this->getId();
-    }
-
-    /**
-     * @param array $fields if empty array all options will be returned, field names can be either with underscored either without, i.e. _percolate, routing
-     * @param bool $withUnderscore should option keys contain underscore prefix
-     * @return array
-     */
-    public function getOptions(array $fields = array(), $withUnderscore = false)
-    {
-        if (!empty($fields)) {
-            $data = array();
-            
-            foreach ($fields as $field) {
-                $key = '_' . ltrim($field, '_');
-                if ($this->hasParam($key) && '' !== (string) $this->getParam($key)) {
-                    $data[$key] = $this->getParam($key);
-                }
-            }
-            
-        } else {
-            $data = $this->getParams();
-        }
-        
-        if (!$withUnderscore) {
-            foreach ($data as $key => $value) {
-                $data[ltrim($key, '_')] = $value;
-                unset($data[$key]);
-            }
-        }
-        return $data;
-    }
-
-    /**
-     * @param  array                               $data
      * @throws \Elastica\Exception\InvalidException
-     * @return \Elastica\Script
+     *
+     * @return self
      */
     protected static function _createFromArray(array $data)
     {
@@ -210,6 +124,7 @@ class Script extends Param
         if (isset($data['lang'])) {
             $script->setLang($data['lang']);
         }
+
         if (isset($data['params'])) {
             if (!is_array($data['params'])) {
                 throw new InvalidException("\$data['params'] should be array");
@@ -221,16 +136,18 @@ class Script extends Param
     }
 
     /**
-     * @return array
+     * {@inheritdoc}
      */
     public function toArray()
     {
         $array = array(
             'script' => $this->_script,
         );
+
         if (!empty($this->_params)) {
-            $array['params'] = $this->_params;
+            $array['params'] = $this->_convertArrayable($this->_params);
         }
+
         if ($this->_lang) {
             $array['lang'] = $this->_lang;
         }
